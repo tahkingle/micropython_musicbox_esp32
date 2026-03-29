@@ -62,33 +62,41 @@ durations = {
     'RW.': 6.0, # Dotted whole rest (6 beats)
 }
 
-# Function to parse the combined notation
 def parse_melody(melody, bpm=120):
+    """Convert tokenized melody strings into (frequency, duration_ms) tuples.
+
+    Token format:
+      - Note: "Q-E4", "H.-A5", ...
+      - Rest: "RQ", "RE.", ...
+    """
+    if bpm <= 0:
+        raise ValueError("bpm must be greater than 0")
+
     parsed_melody = []
+    ms_per_beat = 60000 / bpm
     for item in melody:
-        try:
-            if item.startswith('R'):  # Handle rests
-                rhythm = item
-                duration = int(durations[rhythm] * 60000 / bpm)  # Convert to ms
-                parsed_melody.append((0, duration))
-            else:  # Handle notes
-                rhythm, note = item.split('-')
-                
-                # Debugging prints
-                print(f"Processing: rhythm='{rhythm}', note='{note}'")
+        if item.startswith('R'):
+            if item not in durations:
+                raise ValueError(f"Unknown rest token: '{item}'")
+            duration = int(durations[item] * ms_per_beat)
+            parsed_melody.append((0, duration))
+            continue
 
-                # Ensure that the last character is a digit (octave)
-                octave = note[-1]
-                if not octave.isdigit():
-                    raise ValueError(f"Invalid octave: '{octave}' in note '{note}'")
+        if '-' not in item:
+            raise ValueError(f"Invalid note token: '{item}'")
 
-                # Convert the note duration and frequency
-                duration = int(durations[rhythm] * 60000 / bpm)  # Convert to ms
-                frequency = note_to_frequency(note[:-1], int(octave))
-                parsed_melody.append((frequency, duration))
-        except Exception as e:
-            print(f"Error processing '{item}': {e}")
-            raise
+        rhythm, note = item.split('-', 1)
+        if rhythm not in durations:
+            raise ValueError(f"Unknown note duration token: '{rhythm}'")
+        if len(note) < 2:
+            raise ValueError(f"Invalid note token: '{item}'")
+
+        octave = note[-1]
+        if not octave.isdigit():
+            raise ValueError(f"Invalid octave in token: '{item}'")
+
+        duration = int(durations[rhythm] * ms_per_beat)
+        frequency = note_to_frequency(note[:-1], int(octave))
+        parsed_melody.append((frequency, duration))
     return parsed_melody
-
 
